@@ -1,0 +1,478 @@
+[SQL_FIELD_DEFS]
+//CONTFC, TIPD, NRDI, DATAI, NRN, TIPC, EXPLICN, CODFUR, CONT_COR, DEBIT, CREDIT,
+SQLFIELD(CONTFC)=CONTFC
+SQLFIELD(DEND)=DEND
+SQLFIELD(NRDI)=NRDI
+SQLFIELD(DATAI)=DATAI
+SQLFIELD(NRN)=NRN
+SQLFIELD(NRNR)=NRNIR
+SQLFIELD(GEST)=GEST
+//SQLFIELD(TIPC)=TIPC
+SQLFIELD(EXPLICN)=EXPLICN
+SQLFIELD(CODFUR)=FUR.CODFUR
+SQLFIELD(CONT_COR)=CONT_COR
+SQLFIELD(DEBIT)=SUM(DEBIT) DEBIT
+SQLFIELD(CREDIT)=SUM(CREDIT) CREDIT
+//SQLFIELD(SOLD)=@SOLD := ROUND(@SOLD+IF(TIPC="A",DEBIT-CREDIT,IF(TIPC="P",CREDIT-DEBIT,IF(DEBIT>CREDIT,DEBIT-CREDIT,CREDIT-DEBIT))),2) AS SOLD
+[SQL_FIELD_DEFS]
+
+[SET_IF_EMPTY]
+//%SQL='SELECT DC, CC FROM PLFC'+%PR_LUNA+' WHERE (CODFC="'+%VCODFUR+'") AND (CONT="'+%VCONTFC+'")'
+%SQL2='SELECT DENFUR, COD_FISCAL FROM FUR WHERE (CODFUR="'+%CODFUR+'")'
+SQLOPEN1(%SQL2)
+IF (NOT(@@EOF1))
+  %VDENFUR=@1A;
+  %VCOD_FISCAL=@1B;
+ENDIF
+[SET_IF_EMPTY]
+
+[LISTA_GOALA]
+EXEC[LIST_SOLD_I_ZERO]
+IF ((%OLD_CONT#@CONTFC) OR (%OLD_CODFUR#@CODFUR))
+  %%SOLD_LISTED=0
+  EXEC[TOTAL]
+  //Componenta sold final
+  IF (@@COMPONENTA) 
+    EXEC[DETAIL_COMPONENTA_FINALA]
+    %%SOLD_DB=0
+    %%SOLD_CR=0
+  ENDIF
+  IF (%CU_SALT='DA') 
+    EXEC[HEADER1]
+    WRITE_HEADER
+    %%LAST_RANDINDEX=%%NR_RAND
+    %%NR_RAND=%%HEADER1_LINES+1
+    %%NUMAR_PAGINA=1
+    %%FIRST_HEADER=0
+  ENDIF
+  //EXEC[HEADER2]
+  //WRITE_HEADER 
+  %%LAST_RANDINDEX=%%NR_RAND
+  %%NR_RAND=+%%HEADER2_LINES
+  IF (@@COMPONENTA) EXEC[DETAIL_COMPONENTA_PRE];
+ENDIF
+//EXEC[TOTAL]
+IF (@@COMPONENTA) EXEC[DETAIL_COMPONENTA_FINALA];
+LINES=1
+TEXT[1,80]='*** Produs program D-SOFT ***'
+WRITE_TEXT
+[LISTA_GOALA]
+
+[START]
+//Fisa parteneri 
+%%WIDTH=124
+WIDTH=%%WIDTH
+IF (%%RAND_MAX=0) %%RAND_MAX=65;
+%%HEADER1_LINES=3
+%%HEADER2_LINES=9
+EXEC[GENERAL]
+EXEC[INIT_VARS]
+IF (@@EOF)
+  EXEC[SET_IF_EMPTY]
+//ABORT
+ENDIF
+EXEC[HEADER1]
+WRITE_HEADER
+%%NR_RAND=+%%HEADER1_LINES
+EXEC[HEADER2]
+%%NR_RAND=+%%HEADER2_LINES
+WRITE_HEADER
+IF (@@COMPONENTA) EXEC[DETAIL_COMPONENTA_PRE];
+IF (@@EOF) 
+  EXEC[LISTA_GOALA]
+  ABORT
+ENDIF
+
+WHILE[NOT(@@EOF)]
+  EXEC[DETAIL]
+  READ_NEXT
+  //IF (((@@DEFALCAT) AND (@@DO_SUBTOTAL)))
+  IF (((@@DEFALCAT) AND (@@DO_SUBTOTAL)) AND ((%OLD_NRDI#COPY(1,3,@DEND)+'. '+@NRDI) OR (@@EOF)))
+    LINES=3
+    TEXT[1,1]='|'
+    TEXT[2,1]='|Total '+%OLD_NRDI
+    TEXT[3,1]='|'
+    TEXT[1,123]='|'
+    TEXT[2,123]='|'
+    TEXT[3,123]='|'
+    IF (%%SUBTOTAL_DB#0)
+      TEXT[1,71]='----------------'
+      TEXT[2,71]=STR(16,2,%%SUBTOTAL_DB)
+      TEXT[3,71]='----------------'
+    ENDIF 
+    IF (%%SUBTOTAL_CR#0)
+      TEXT[1,88]='----------------'   
+      TEXT[2,88]=STR(16,2,%%SUBTOTAL_CR)
+      TEXT[3,88]='----------------'
+    ENDIF
+    WRITE_TEXT
+    @@DO_SUBTOTAL=(0=1)
+    %%NR_RAND=+3
+  ENDIF
+  IF ((%OLD_CONT#@CONTFC) OR (%OLD_CODFUR#@CODFUR))
+    %%SOLD_LISTED=0
+    EXEC[TOTAL]
+    //Componenta sold final
+    IF (@@COMPONENTA) 
+      EXEC[DETAIL_COMPONENTA_FINALA]
+      %%SOLD_DB=0
+      %%SOLD_CR=0
+    ENDIF
+    IF (%CU_SALT='DA') 
+      EXEC[HEADER1]
+      WRITE_HEADER
+      %%LAST_RANDINDEX=%%NR_RAND
+      %%NR_RAND=%%HEADER1_LINES+1
+      %%NUMAR_PAGINA=1
+      %%FIRST_HEADER=0
+    ENDIF
+    EXEC[HEADER2]
+    WRITE_HEADER 
+    %%LAST_RANDINDEX=%%NR_RAND
+    %%NR_RAND=+%%HEADER2_LINES
+    IF (@@COMPONENTA) EXEC[DETAIL_COMPONENTA_PRE];
+  ENDIF
+WHILEEND
+EXEC[TOTAL]
+IF (@@COMPONENTA) EXEC[DETAIL_COMPONENTA_FINALA];
+LINES=1
+TEXT[1,80]='*** Produs program D-SOFT ***'
+WRITE_TEXT
+[START]
+
+[GENERAL]
+%%NUMAR_PAGINA=1
+%%SOLD_DB=0
+%%SOLD_CR=0
+%%FIRST_HEADER=0
+%%NR_RAND=0
+%END_PAGE='\-------------------------------------------------------------------------------------------------------------------------/'+CHR(12)+CHR(13)+CHR(10)
+[GENERAL]
+
+[INIT_VARS]
+
+[INIT_VARS]
+
+[HEADER1]
+LINES=%%HEADER1_LINES
+RAW1
+
+ ~%FIRMA.DENUMIRE 
+ Cod fiscal : ~%FIRMA.COD_FISCAL 
+RAWEND
+IF (%DATA_LISTE='DA') TEXT[1,1]=' Data listarii: '+%DATA_LISTARII;
+//TEXT[5,1]=CENTER(%%WIDTH,'pe luna: '+%LUNA_LITERE+' '+%ANUL)
+HEADER=TEXT
+//%%NR_RAND=+%%HEADER1_LINES
+[HEADER1]
+
+
+[HEADER2]
+LINES=%%HEADER2_LINES
+RAW1
+
+
+
+
+/=========================================================================================================================\
+|                                                          |  Cont   |                |                |                  |
+|                  E X P L I C A T I I                     |Corespon-|     Debit      |     Credit     |      Sold        |
+|                                                          |  dent   |                |                |                  |
+|=========================================================================================================================|
+RAWEND
+IF (@DENFUR#'') %VDENFUR=@DENFUR;
+IF (@COD_FISCAL#'') %VCOD_FISCAL=@COD_FISCAL;
+TEXT[2,1]=CENTER(%%WIDTH,'Fisa partenerului '+%VDENFUR+', CUI: '+%VCOD_FISCAL)
+TEXT[3,1]=CENTER(%%WIDTH,'Cont banca: '+@CONTB+' Denumire banca: '+@DENB)
+TEXT[4,1]=CENTER(%%WIDTH,'Perioada: '+%PERIOADA)
+TEXT[4,2]='Contul: '+@CONTFC
+//IF ((%%FIRST_HEADER=0) OR (%CU_SALT='DA')) TEXT[4,112]='Pagina: '+STR(4,0,%%NUMAR_PAGINA);
+%%TEMP=%%NR_RAND+%%HEADER2_LINES
+IF (%%TEMP>%%RAND_MAX) TEXT[4,112]='Pagina: '+STR(4,0,%%NUMAR_PAGINA+1);
+IF (%%NR_RAND=%%HEADER1_LINES) TEXT[4,112]='Pagina: '+STR(4,0,%%NUMAR_PAGINA);
+EXEC[SET_ALIAS]
+%OLD_CONT=%VCONTFC
+%OLD_CODFUR=%VCODFUR
+%%FIRST_HEADER=1
+%%DO_LINE=0
+%%WROTE_TOTAL=0
+%%DID_HEADER2=1
+HEADER=TEXT
+[HEADER2]
+
+[NEW_PAGE]
+%%NUMAR_PAGINA=+1
+%%FIRST_HEADER=0
+HEADER[4,112]='Pagina: '+STR(4,0,%%NUMAR_PAGINA)
+//IF (%%WROTE_TOTAL=0) 
+  %END_LINE=%END_PAGE
+//ELSE
+//  %END_LINE=CHR(12)+CHR(13)+CHR(10)
+//ENDIF
+
+//%END_LINE=STR(2,0,%%NR_RAND)+':'+STR(2,0,%%LAST_RANDINDEX)+CHR(12)+CHR(13)+CHR(10)
+//%END_LINE=CHR(12)+CHR(13)+CHR(10)
+IF (%%DID_HEADER2=0)
+  INSERT[%%LAST_RANDINDEX-%%NR_RAND]=%END_LINE+HEADER
+  %%DID_HEADER2=1
+ELSE
+  INSERT[%%LAST_RANDINDEX-%%NR_RAND]=%END_LINE
+  %%NR_RAND=-%%HEADER2_LINES
+ENDIF
+%%NR_RAND=+%%HEADER2_LINES-%%LAST_RANDINDEX-1
+FLUSH
+[NEW_PAGE]
+
+[SET_ALIAS]
+IF (@@EOF) 
+  %VCODFUR=%CODFUR
+  %VCONTFC=%CONT
+ELSE
+  %VCODFUR=@CODFUR
+  %VCONTFC=@CONTFC
+ENDIF
+[SET_ALIAS]
+
+[LIST_SOLD_I_ZERO]
+EXEC[SET_ALIAS]
+%PR_LUNA=COPY(4,2,%PERIOADA)+COPY(9,2,%PERIOADA)
+%SQL='SELECT DC, CC, CONT FROM PLFC'+%PR_LUNA+' WHERE (CODFC="'+%VCODFUR+'")'
+//LINES=1
+//WRITE_%SQL
+SQLOPEN1(%SQL)
+WHILE[NOT(@@EOF1)]
+  %%SOLDA_DB=@%1A;
+  %%SOLDA_CR=@%1B;
+  LINES=1
+  TEXT[1,1]='|                                  SOLD precedent:                                                                        |'
+  TEXT[1,50]=' CONT:'+@1C;
+  IF (%%SOLDA_DB>%%SOLDA_CR) 
+    TEXT[1,104]=STR(16,2,%%SOLDA_DB-%%SOLDA_CR)+' DB'
+  ELSE
+    IF (%%SOLDA_DB-%%SOLDA_CR#0) 
+      TEXT[1,104]=STR(16,2,%%SOLDA_CR-%%SOLDA_DB)+' CR'
+    ENDIF
+  ENDIF
+  WRITE_TEXT
+  READ_NEXT1
+  %%SOLD_LISTED=1 
+  %%NR_RAND=+1
+WHILEEND
+[LIST_SOLD_I_ZERO]
+
+[LIST_SOLD_I]
+EXEC[SET_ALIAS]
+%PR_LUNA=COPY(4,2,%PERIOADA)+COPY(9,2,%PERIOADA)
+%SQL='SELECT DC, CC FROM PLFC'+%PR_LUNA+' WHERE (CODFC="'+%VCODFUR+'") AND (CONT="'+%VCONTFC+'")'
+//LINES=1
+//WRITE_%SQL
+SQLOPEN1(%SQL)
+IF(NOT(@@EOF1))
+  %%SOLDA_DB=@%1A;
+  %%SOLDA_CR=@%1B;
+ENDIF
+LINES=1
+TEXT[1,1]='|                                  SOLD precedent:                                                                        |'
+IF (%%SOLDA_DB>%%SOLDA_CR) 
+  TEXT[1,104]=STR(16,2,%%SOLDA_DB-%%SOLDA_CR)+' DB'
+ELSE
+  IF (%%SOLDA_DB-%%SOLDA_CR#0) 
+    TEXT[1,104]=STR(16,2,%%SOLDA_CR-%%SOLDA_DB)+' CR'
+  ENDIF
+ENDIF
+WRITE_TEXT
+%%SOLD_LISTED=1 
+%%NR_RAND=+1
+[LIST_SOLD_I]
+
+// SE EXECUTA PENTRU FIECARE INREGISTRARE SQL
+[DETAIL]
+IF (%%SOLD_LISTED=0) EXEC[LIST_SOLD_I];
+IF(%OLD_NRDI=COPY(1,3,@DEND)+'. '+@NRDI) 
+  @@DO_SUBTOTAL=(1=1)
+  %%SUBTOTAL_DB=+@%DEBIT
+  %%SUBTOTAL_CR=+@%CREDIT
+ENDIF
+
+IF (%%NR_RAND>%%RAND_MAX) EXEC[NEW_PAGE];
+LINES=1
+%T='|'+COPY(1,3,@DEND)+'. '+@NRDI+'/'+COPY(1,2,@DATAI)+'.'+COPY(3,2,@DATAI)+'.'+COPY(5,4,@DATAI)+' NC:'+@NRN
+IF (@NRNIR#'0') %T=+' NIR:'+@NRNIR;
+IF (@GEST#'') %T=+' G:'+@GEST;
+%T=+' '+@EXPLICN
+TEXT[1,1]=COPY(1,59,%T)
+//TEXT[1,1]=STR(2,0,%%NR_RAND)+':'+STR(2,0,%%LAST_RANDINDEX)
+//TEXT[1,62]=RIGHT(8,@CONT_COR)
+TEXT[1,61]=@CONT_COR
+IF (@%DEBIT#0) TEXT[1,71]=STR(16,2,@%DEBIT);
+IF (@%CREDIT#0) TEXT[1,88]=STR(16,2,@%CREDIT);
+%%SOLD_DB=+@%DEBIT
+%%SOLD_CR=+@%CREDIT
+
+%%SOLDA_DB=+@%DEBIT
+%%SOLDA_CR=+@%CREDIT
+
+IF (%%SOLDA_DB>%%SOLDA_CR) 
+  TEXT[1,104]=STR(16,2,%%SOLDA_DB-%%SOLDA_CR)+' DB'
+ELSE
+
+  IF (%%SOLDA_DB-%%SOLDA_CR#0) 
+    TEXT[1,104]=STR(16,2,%%SOLDA_CR-%%SOLDA_DB)+' CR'
+  ENDIF
+ENDIF
+TEXT[1,123]='|'
+
+%%LAST_RANDINDEX=%%NR_RAND
+%%NR_RAND=+1
+WRITE_TEXT
+%OLD_NRDI=COPY(1,3,@DEND)+'. '+@NRDI
+IF (NOT(@@DO_SUBTOTAL))
+  %%SUBTOTAL_DB=@%DEBIT
+  %%SUBTOTAL_CR=@%CREDIT
+ENDIF
+%%DID_HEADER2=0
+%%DO_LINE=1
+
+[DETAIL]
+
+[DETAIL_COMPONENTA_PRE]
+EXEC[SET_ALIAS]
+%SQL='SELECT NRDFC, DATAFC, NC, GESTIUNE, EXPLIC, SUMADB, SUMACR, CONTCOR '
+%SQL=+'FROM FRES'+%LA_SOLD_P+' '
+%SQL=+'WHERE CODFC = "'+%VCODFUR+'" AND CONTFC = "'+%VCONTFC+'"  AND (SUMADB-SUMACR <> 0)'
+SQLOPEN1(%SQL)
+@@COMP1_LISTED=(0=1)
+IF (NOT(@@EOF1)) 
+  LINES=1
+  TEXT[1,1]='|                                  SOLD precedent:                                                                        |'
+  %%SOLD_LISTED=1
+  WRITE_TEXT
+  %%LAST_RANDINDEX=%%NR_RAND  
+  %%NR_RAND=+1
+ENDIF
+WHILE[NOT(@@EOF1)]
+  IF (%%NR_RAND>=%%RAND_MAX) EXEC[NEW_PAGE];
+  @@COMP1_LISTED=(1=1)
+  LINES=1
+  TEXT[1,1]='|Fac.'
+  TEXT[1,7]=@1A;+'/'+COPY(1,2,@1B;)+'.'+COPY(3,2,@1B;)+'.'+COPY(5,4,@1B;)+' NC:'+@1C;+' G:'+@1D;+' '+@1E;
+  TEXT[1,61]=@1H;
+  IF (@%1F;#0) TEXT[1,71]=STR(16,2,@%1F;);
+  IF (@%1G;#0) TEXT[1,88]=STR(16,2,@%1G;);
+  %%SOLDP_DB=+@%1F;
+  %%SOLDP_CR=+@%1G;
+
+  IF (%%SOLDP_DB>%%SOLDP_CR) 
+    TEXT[1,104]=STR(16,2,%%SOLDP_DB-%%SOLDP_CR)+' DB'
+  ELSE
+    IF (%%SOLDP_DB<%%SOLDP_CR) 
+      TEXT[1,104]=STR(16,2,%%SOLDP_CR-%%SOLDP_DB)+' CR'
+    ENDIF
+  ENDIF
+
+  TEXT[1,123]='|'
+  //TEXT[1,1]=STR(2,0,%%NR_RAND)+':'+STR(2,0,%%LAST_RANDINDEX)
+  READ_NEXT1
+  WRITE_TEXT
+  %%DID_HEADER2=0
+  %%LAST_RANDINDEX=%%NR_RAND
+  %%NR_RAND=+1
+WHILEEND
+IF (@@COMP1_LISTED)
+  LINES=1
+  %%LAST_RANDINDEX=%%NR_RAND
+  %%NR_RAND=+1 
+  //TEXT[1,1]='\================================================================================='+STR(2,0,%%NR_RAND)+':'+STR(2,0,%%LAST_RANDINDEX)+'===================================/'
+  TEXT[1,1]='|========================================= Sold la sfarsitul lunii precedente ============================================|'
+  WRITE_TEXT
+%%SOLDA_DB=%%SOLDP_DB
+%%SOLDA_CR=%%SOLDP_CR
+%%SOLDP_DB=0
+%%SOLDP_CR=0
+ENDIF
+[DETAIL_COMPONENTA_PRE]
+
+[DETAIL_COMPONENTA_FINALA]
+%SQL='SELECT NRDFC, DATAFC, NC, GESTIUNE, EXPLIC, SUMADB, SUMACR, CONTCOR '
+%SQL=+'FROM FRES'+%LA_SOLD_F+' '
+%SQL=+'WHERE CODFC = "'+%OLD_CODFUR+'" AND CONTFC = "'+%OLD_CONT+'" AND (SUMADB-SUMACR <> 0)'
+SQLOPEN1(%SQL)
+@@COMP_LISTED=(0=1)
+%%SOLD_DB=0
+%%SOLD_CR=0
+WHILE[NOT(@@EOF1)]
+  IF (%%NR_RAND>=%%RAND_MAX) EXEC[NEW_PAGE];
+  @@COMP_LISTED=(1=1)
+  LINES=1
+  TEXT[1,1]='|Fac.'
+  TEXT[1,7]=@1A;+'/'+COPY(1,2,@1B;)+'.'+COPY(3,2,@1B;)+'.'+COPY(5,4,@1B;)+' NC:'+@1C;+' G:'+@1D;+' '+@1E;
+  TEXT[1,61]=@1H;
+  IF (@%1F;#0) TEXT[1,71]=STR(16,2,@%1F;);
+  IF (@%1G;#0) TEXT[1,88]=STR(16,2,@%1G;);
+
+  %%SOLD_DB=+@%1F;
+  %%SOLD_CR=+@%1G;
+
+  IF (%%SOLD_DB>%%SOLD_CR) 
+    TEXT[1,104]=STR(16,2,%%SOLD_DB-%%SOLD_CR)+' DB'
+  ELSE
+    IF (%%SOLD_DB<%%SOLD_CR) 
+      TEXT[1,104]=STR(16,2,%%SOLD_CR-%%SOLD_DB)+' CR'
+    ENDIF
+  ENDIF
+
+  TEXT[1,123]='|'
+  //TEXT[1,1]=STR(2,0,%%NR_RAND)+':'+STR(2,0,%%LAST_RANDINDEX)
+  READ_NEXT1
+  WRITE_TEXT
+  %%LAST_RANDINDEX=%%NR_RAND
+  %%NR_RAND=+1
+  %%DID_HEADER2=0
+WHILEEND
+IF (@@COMP_LISTED)
+  LINES=1
+  %%LAST_RANDINDEX=%%NR_RAND
+  %%NR_RAND=+1 
+  //TEXT[1,1]='\================================================================================='+STR(2,0,%%NR_RAND)+':'+STR(2,0,%%LAST_RANDINDEX)+'===================================/'
+  TEXT[1,1]='\=========================================================================================================================/'
+  WRITE_TEXT
+ENDIF
+[DETAIL_COMPONENTA_FINALA]
+
+[TOTAL]
+LINES=3
+RAW1
+|=========================================================================================================================|
+| T O T A L  Rulaj Perioada:                                                                                              |
+\=========================================================================================================================/
+RAWEND
+TEXT[2,30]=%PERIOADA
+IF (%%SOLD_DB#0) TEXT[2,71]=STR(16,2,%%SOLD_DB);
+IF (%%SOLD_CR#0) TEXT[2,88]=STR(16,2,%%SOLD_CR);
+%%SOLD_DB=0
+%%SOLD_CR=0
+
+IF ((%%SOLDA_DB>%%SOLDA_CR)AND(NOT(@@EOF)))
+  TEXT[2,104]=STR(16,2,%%SOLDA_DB-%%SOLDA_CR)+' DB'
+ELSE
+  IF ((%%SOLDA_DB<%%SOLDA_CR)AND(NOT(@@EOF)))
+    TEXT[2,104]=STR(16,2,%%SOLDA_CR-%%SOLDA_DB)+' CR'
+  ENDIF
+ENDIF
+
+IF ((@@COMPONENTA) AND (%%SOLDA_DB#%%SOLDA_CR))
+  TEXT[3,44]=' Componenta soldului la sfirsitul lunii '
+  TEXT[3,1]='|'
+  TEXT[3,123]='|'
+ENDIF
+IF (%CU_SALT='DA') TEXT[3,110]=CHR(12)+CHR(13)+CHR(10);
+WRITE_TEXT
+%%SOLDA_DB=0
+%%SOLDA_CR=0
+
+//%%LAST_RANDINDEX=%%NR_RAND
+%%NR_RAND=+3
+%%WROTE_TOTAL=1
+IF (%%NR_RAND>=%%RAND_MAX) EXEC[NEW_PAGE];
+%%LAST_RANDINDEX=%%NR_RAND
+[TOTAL]

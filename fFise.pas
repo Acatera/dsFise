@@ -1,0 +1,212 @@
+unit fFise;
+
+interface
+
+uses
+  SysUtils, Classes, DBTables, fMyLib, fMyPeriod;
+
+function GetFisaPartener(AQuery: TQuery; CodPartener: string; Conturi: string; Perioada: TMyPeriod; var Records: integer; const Terminal: byte = 1): TStringList;
+function GetFisaCont(AQuery: TQuery; CodParteneri: TStringList; Conturi: string; Perioada: TMyPeriod; var Records: integer; const Terminal: byte = 1): TStringList;
+
+implementation
+
+function GetFisaPartener(AQuery: TQuery; CodPartener: string; Conturi: string; Perioada: TMyPeriod; var Records: integer; const Terminal: byte = 1): TStringList;
+var
+  s: string;
+  SQL: string;
+  tblName: string;
+  slFiles: TStringList;
+  slTables: TStringList;
+  i: byte;
+  r: integer;
+  s1,s2: string;
+begin
+  Result := TStringList.Create;
+  try
+    if Perioada = nil then begin RaiseEx('GetFisaCont', 'Perioada is nil.'); Exit end;
+    if AQuery = nil then begin RaiseEx('GetFisaCont', 'AQuery is nil.'); Exit; end;
+    if (Perioada.GetFirst = '00001900') or (Perioada.GetLast = '00001900') then begin
+      RaiseEx('GetFisaCont', 'Perioada is invalid.'); Exit; end;
+  finally
+  end;
+
+  s := i2s(Terminal);
+  Perioada.First;
+  tblName := 'TMP_FISA' + s;    //TEMPORARY
+  DoSQL(AQuery, ' DROP  TABLE IF EXISTS `TMP_FISA' + s + '`');
+  DoSQL(AQuery, 'CREATE  TABLE IF NOT EXISTS `TMP_FISA' + s + '` (' +
+                  '`NRN` char(3) NOT NULL default "", ' +
+                  '`EXPLICN` char(40) NOT NULL default "", ' +
+                  '`GEST` char(6) NOT NULL default "", ' + 
+                  '`CODFUR` char(16) NOT NULL default "", ' +
+                  '`TIPDI` char(2) NOT NULL default "", ' +
+                  '`NRDI` int(8) NOT NULL default 0, ' +
+                  '`DATAI` char(8) NOT NULL default "", ' +
+                  '`DATASC` char(8) NOT NULL default "", ' +
+                  '`NRNIR` int(8) NOT NULL default 0, ' +
+                  '`DATANIR` char(8) NOT NULL default "", ' +
+                  '`NRDE` int(8) NOT NULL default 0, ' +
+                  '`DATAE` char(8) NOT NULL default "", ' +
+                  '`DEBIT` char(8) NOT NULL default "", ' +
+                  '`CREDIT` char(8) NOT NULL default "", ' +
+                  '`SUMA` double(15,2) NOT NULL default 0.00, ' +
+                  '`SUMA_VAL` double(15,2) NOT NULL default 0.00, ' +
+                  '`ANULAT` char(8) NOT NULL default "", ' +
+                  '`URM` char(1) NOT NULL default "", ' +
+                  'KEY (`CODFUR`, `DEBIT`, `CREDIT`, `TIPDI`)' +
+                  ')ENGINE=InnoDB DEFAULT CHARSET=latin1');
+  Perioada.First;
+  r := 0; //affected rows;
+  s1 := '';
+  if CodPartener <> '' then
+    s1 := '(FURCLI IN ("' + CodPartener + '")) AND ';
+  s2 := '';
+  if Conturi <> '' then
+    s2 := '((DEBIT = "' +  Conturi + '") OR (CREDIT = "' + Conturi + '"))  AND ';
+
+  try
+    slFiles := TStringList.Create;
+    slFiles.Add('RMAT'); slFiles.Add('RNIR'); slFiles.Add('RULA');
+    slTables := GetTableList(AQuery);
+    while not Perioada.Eof do begin
+      for i := 0 to slFiles.Count - 1 do
+        if slTables.IndexOf(slFiles[i] + Perioada.GetCurrentDate(4)) <> -1 then
+          SQL := SQL + 'SELECT NRN, EXPLICN, GEST, FURCLI, TIPDI, NRDI, DATAI, DATASC, NRNIR, DATANIR, NRDE, DATAE, DEBIT, CREDIT, SUMA, SUMA_VAL, ANULAT, "" ' +
+                   'FROM ' + slFiles[i] + Perioada.GetCurrentDate(4) + ' '+
+                   'WHERE ' + s1 + s2 + ' (ANULAT <> "A") AND (SUMA <> 0) UNION ALL ';
+      Perioada.Next;
+    end;
+
+    if SQL <> '' then
+      r := DoSQL(AQuery, 'INSERT INTO ' + tblName + ' ' + Copy(SQL, 1, l(SQL) - 11));
+
+    DoSQL(AQuery, 'UPDATE ' + tblName + ' P, PLC00 P0 SET P.URM = "D" WHERE P.DEBIT LIKE CONCAT(P0.CONT,"%") AND P0.ANALITIC <> ""');
+    DoSQL(AQuery, 'UPDATE ' + tblName + ' P, PLC00 P0 SET P.URM = "C" WHERE P.CREDIT LIKE CONCAT(P0.CONT,"%") AND P0.ANALITIC <> ""');
+    
+    DoSQL(AQuery, 'DROP TABLE IF EXISTS TMP_RUFC' + s);  //TEMPORARY
+    DoSQL(AQuery, 'CREATE TABLE IF NOT EXISTS TMP_RUFC' + s + ' (' +
+                    '`CONTFC` char(8) NOT NULL default "", ' +
+                    '`DEND` char(3) NOT NULL default "", ' +
+                    '`NRDI` int(8) NOT NULL default 0, ' +
+                    '`DATAI` char(8) NOT NULL default "", ' +
+                    '`DATASC` char(8) NOT NULL default "", ' +
+                    '`NRDE` int(8) NOT NULL default 0, ' +
+                    '`DATAE` char(8) NOT NULL default "", ' +
+                    '`NRNIR` int(8) NOT NULL default 0, ' +
+                    '`NRN` char(3) NOT NULL default "", ' +
+                    '`GEST` char(6) NOT NULL default "", ' +
+                    '`EXPLICN` char(40) NOT NULL default "", ' +
+                    '`CODFUR` char(16) NOT NULL default "", ' +
+                    '`CONT_COR` char(8) NOT NULL default "", ' +
+                    '`DEBIT` double(15,2) NOT NULL default 0.00, ' +
+                    '`CREDIT` double(15,2) NOT NULL default 0.00, ' +
+                    'KEY (`CODFUR`, `NRDI`,`CONTFC`,`NRN`)' +
+                    ')ENGINE=InnoDB DEFAULT CHARSET=latin1');
+    DoSQL(AQuery, 'INSERT INTO TMP_RUFC' + s + ' ' +
+                    'SELECT ' +
+                      '@CONT := IF(URM = "D", DEBIT, CREDIT) CONTFC, ' +
+//                      '@CONT:= IF((DEBIT LIKE CONCAT("' + Conturi + '","%")) OR (URM = "D"),DEBIT,IF((CREDIT LIKE CONCAT("' + Conturi + '","%")) OR (URM = "C"),CREDIT,"")) CONTFC, ' +
+                      'IFNULL(LEFT(DEND,3),"Doc") TIPD, NRDI, DATAI, DATASC, NRDE, DATAE, NRNIR, NRN, GEST, EXPLICN, CODFUR, ' +
+                      'IF(NOT (DEBIT = @CONT), DEBIT, CREDIT) CONT_COR, ' +
+                      'SUM(IF(DEBIT = @CONT, SUMA, 0)) DEBIT, ' +
+                      'SUM(IF(CREDIT = @CONT, SUMA, 0)) CREDIT ' +
+                     'FROM ' +
+                       //PLC00 P0 LEFT JOIN TMP_FISA' + s + ' ON ((DEBIT LIKE CONCAT(CONT,"%")) OR (CREDIT LIKE CONCAT(CONT,"%"))) ' +
+                       'TMP_FISA' + s + ' LEFT JOIN TIPD ON (TIPDI = TIPD) ' +
+                     //'WHERE (ANULAT <> "A") AND (LOCATE("9", TIP_SOC) <> 0) AND (ANALITIC <> "") AND (LENGTH(CONT) = 3) ' +
+                     //'WHERE (ANULAT <> "A") ' + //Already did the ANULAT <> "A"
+                     'WHERE URM <> "" ' +
+                     'GROUP BY CODFUR, NRDI, DATAI, NRDE, DATAE, NRNIR, DATANIR, CONTFC, NRN ' +
+                     'ORDER BY CONTFC, CONCAT(MID(DATAI,5,4), MID(DATAI,3,2),MID(DATAI,1,2)), NRDI,  CONT_COR');
+  finally
+    slFiles.Free;
+    slTables.Free;
+  end;
+  Records := r;
+end;
+
+function GetFisaCont(AQuery: TQuery; CodParteneri: TStringList; Conturi: string; Perioada: TMyPeriod; var Records: integer; const Terminal: byte = 1): TStringList;
+var
+  i: byte;
+  slFiles: TStringList;
+  slTables: TStringList;
+  SQL: string;
+  tblName: string;
+  r: integer;
+  s: string;
+begin
+  Result := TStringList.Create;
+  try
+    if Perioada = nil then begin RaiseEx('GetFisaPartener', 'Perioada is nil.'); Exit end;
+    if AQuery = nil then begin RaiseEx('GetFisaPartener', 'AQuery is nil.'); Exit; end;
+    if (Perioada.GetFirst = '00001900') or (Perioada.GetLast = '00001900') then begin
+      RaiseEx('GetFisaPartener', 'Perioada is invalid.'); Exit; end;
+  finally
+  end;
+
+  tblName := 'TMP_NOTE' + i2s(Terminal);
+  DoSQL(AQuery,'DROP TABLE IF EXISTS TMP_NOTE' + i2s(Terminal));
+  DoSQL(AQuery,
+    'CREATE TABLE IF NOT EXISTS ' + tblName + ' (' +
+      '`TIPC` char(1) NOT NULL default "",' +
+      '`DENC` char(50) NOT NULL default "",' +
+      '`NRN` char(3) NOT NULL default "",' +
+      '`TIPN` char(3) NOT NULL default "",' +
+      '`FELN` char(2) NOT NULL default "",' +
+      '`NRDI` bigint(10) NOT NULL default 0,' +
+      '`DATAI` char(8) NOT NULL default "",' +
+      '`EXPLIC` char(50) NOT NULL default "",' +
+      '`FURCLI` char(15) NOT NULL default "",' +
+      '`LUCRARE` char(15) NOT NULL default "",' +
+      '`DEBIT` char(9) NOT NULL default "",' +
+      '`CREDIT` char(9) NOT NULL default "",' +
+      '`SUMA` double(17,2) NOT NULL default 0.00,' +
+      '`SUMA_VAL` double(17,2) NOT NULL default 0.00, ' +
+      '`INTIES` char(1) NOT NULL default "",' +
+      '`TIP_VAL` char(3) NOT NULL default "",' +
+      '`K_REP` double(15,8) NOT NULL default "", ' +
+      '`GESTIUNE` char(6) NOT NULL default "",' +
+      '`SRC` char(4) NOT NULL default "",' +
+      'KEY `DEBIT` (`DEBIT`),' +
+      'KEY `CREDIT` (`CREDIT`),' +
+      'KEY `DBCR` (`DEBIT`,`CREDIT`)' +
+    ') ENGINE=InnoDB DEFAULT CHARSET=latin1;');
+  try
+    try
+      slFiles := TStringList.Create;
+      slFiles.Add('RULA'); slFiles.Add('RMAT'); slFiles.Add('RNIR'); slFiles.Add('RMTR'); slFiles.Add('RMIF');
+      slTables := GetTableList(AQuery);
+      if Conturi <> '' then
+        s := 'AND (LEFT(CONT,' + i2s(l(Conturi)) + ') = "' + Conturi + '") '
+      else s := '';
+
+      Perioada.First;
+
+      while not Perioada.Eof do begin
+        for i := 0 to slFiles.Count - 1 do
+          if slTables.IndexOf(slFiles[i] + Perioada.GetCurrentDate(4)) <> -1 then
+            SQL := SQL +
+              'SELECT TIPC, DENC, NRN, TIPDI, FELN, NRDI, DATAI, ' +
+                'IF(LEFT(UPPER(EXPLICN),4)="C.V." OR NRN = 25,EXPLICN,EXPLICN) EXPLIC, FURCLI, DEBIT, CREDIT, ' +
+                'SUM(SUMA) SUMA, SUM(SUMA_VAL) SUMA_VAL, T.TIP_VAL, GEST, INTIES, LUCRARE ' +
+              'FROM ' + slFiles[i] + Perioada.GetCurrentDate(4) + ' T LEFT JOIN PLC' + Perioada.GetCurrentDate(4) + ' P ON ((DEBIT = CONT) OR (CREDIT = CONT))' +
+              'WHERE (TIPDI <> "+") AND (ANULAT <> "A") ' + s + 
+              'GROUP BY NRN, NRDI, DATAI, DEBIT, CREDIT, FURCLI, GEST, LUCRARE ' +
+              'UNION ALL ';
+        Perioada.Next;
+      end;
+      r := DoSQL(AQuery, 'INSERT INTO ' + tblName + ' (TIPC, DENC, NRN, TIPN, FELN, NRDI, DATAI, EXPLIC, FURCLI, DEBIT, CREDIT, SUMA, ' +
+        'SUMA_VAL, TIP_VAL, GESTIUNE, INTIES, LUCRARE) ' + Copy(SQL, 1, l(SQL) - 11));
+
+    except
+
+    end;
+  finally
+    slFiles.Free;
+    slTables.Free;
+    Records := r;
+  end;
+
+end;
+
+end.

@@ -1,0 +1,270 @@
+[SQL_FIELD_DEFS]
+//SQLFIELD(SOLD)=@SOLD := @SOLD + IF(TIPC="A", DB-CR, IF(TIPC="P", CR-DB, IF(DB > CR, DB-CR, CR-DB))) SOLD
+SQLFIELD(DATAI)=CONCAT(LEFT(DATAI,2),'.',MID(DATAI,3,2)) DATAI
+SQLFIELD(LUNA)=MID(DATAI,3,2) LUNA
+SQLFIELD(EXPLIC)=UPPER(EXPLIC) EXPLIC
+//SQLFIELD(DATAI)=CONCAT(MID(DATAI,1,2),".",MID(DATAI,3,2),".",MID(DATAI,5,4)) DATAI
+[SQL_FIELD_DEFS]
+
+[LISTA_GOALA]
+WRITE_'!!! NU EXISTA NICI UN PARTENER CONFORM CRITERIILOR SELECTATE !!!'
+[LISTA_GOALA]
+
+[START]
+//Fisa cont
+IF (@@EOF) 
+  EXEC[LISTA_GOALA]
+  ABORT
+ENDIF
+%%WIDTH=134
+WIDTH=%%WIDTH
+IF (%%RAND_MAX=0) %%RAND_MAX=65;
+%%HEADER1_LINES=3
+%%HEADER2_LINES=9
+EXEC[GENERAL]
+EXEC[INIT_VARS]
+EXEC[HEADER1]
+WRITE_HEADER
+%%NR_RAND=+%%HEADER1_LINES
+EXEC[HEADER2]
+%%NR_RAND=+%%HEADER2_LINES
+WRITE_HEADER
+EXEC[DO_SOLD_PRE]
+IF (NOT(@@EOF)) %OLD_LUNA=@LUNA;
+WHILE[NOT(@@EOF)]
+  EXEC[DETAIL]
+  READ_NEXT
+  IF ((%OLD_CONT#@CONT) OR ((%OLD_CODFUR#@FURCLI)AND(%PE_CODFUR='DA')))
+    EXEC[TOTAL]
+    IF (%CU_SALT='DA')
+      EXEC[HEADER1]
+      WRITE_HEADER
+      %%NR_RAND=%%HEADER1_LINES+1
+      %%NUMAR_PAGINA=1
+      %%FIRST_HEADER=0
+      %%LAST_RANDINDEX=%%NR_RAND
+    ENDIF
+    EXEC[HEADER2]
+    WRITE_HEADER
+    EXEC[DO_SOLD_PRE]
+    %%NR_RAND=+%%HEADER2_LINES
+  ENDIF
+WHILEEND
+%%DONE=1
+EXEC[TOTAL]
+LINES=1
+TEXT[1,104]='*** Produs program D-SOFT ***'
+WRITE_TEXT
+[START]
+
+[GENERAL]
+%APOSTROF=CHR(39)+CHR(39)
+%%NUMAR_PAGINA=1
+%%FIRST_HEADER=0
+%%NR_RAND=0
+%%NR_CRT=1
+%END_PAGE='-------------------------------------------------------------------------------------------------------------'+CHR(12)+CHR(13)+CHR(10)
+[GENERAL]
+
+[INIT_VARS]
+%%TOTAL=0
+%%TOTAL_NOTA=0
+%%TOTAL_6=0
+%%TOTAL_9=0
+[INIT_VARS]
+
+[HEADER1]
+LINES=%%HEADER1_LINES
+RAW1
+
+ ~%FIRMA.DENUMIRE 
+ Cod fiscal : ~%FIRMA.COD_FISCAL 
+RAWEND
+IF (%DATA_LISTE='DA') TEXT[1,1]=' Data listarii: '+%DATA_LISTARII;
+HEADER=TEXT
+//%%NR_RAND=+%%HEADER1_LINES
+[HEADER1]
+
+
+[HEADER2]
+%SQL='SELECT DENC, IF(DC>CC,DC-CC,CC-DC) SLD '
+%SQL=+'FROM PLC'+%LLAA+' WHERE CONT = "'+@CONT+'"'
+SQLOPEN1(%SQL)
+LINES=%%HEADER2_LINES
+RAW1
+
+|----------------------------------------------------------------------------------------------------------------------------------|
+|                                       FISA DE CONT PENTRU OPERATII DIVERSE                                      | Cont    |      |
+|                                                                                            Profit sau pierdere  |121      |      |
+|----------------------------------------------------------------------------------------------------------------------------------|
+| Data  |     Document     |                                 | Simbol |                  |                  |                      |
+|-------|------------------|           Explicatii            |  cont  |      Debit       |      Credit      |        Sold          |
+| 2011  |  Fel  |    Nr.   |                                 | coresp.|                  |                  |                      |
+|----------------------------------------------------------------------------------------------------------------------------------|
+RAWEND
+IF ((%%FIRST_HEADER=0) OR (%CU_SALT='DA')) 
+  TEXT[3,127]='Pag.'
+  TEXT[4,127]=STR(3,0,%%NUMAR_PAGINA)
+ENDIF
+TEXT[4,41]=CENTER(23,%LUNA_LITERE+' '+%ANUL)
+TEXT[4,116]=RIGHT(8,@CONT)
+IF (%PE_CODFUR='DA') TEXT[4,2]='Partener: '+@DENFUR+':'+@COD_FISCAL;
+%DBCR=''
+%%NR_RAND=+3
+%OLD_CONT=@CONT
+%OLD_CODFUR=@FURCLI
+IF (NOT(@@EOF1))
+  TEXT[4,64]=RIGHT(50, @1A;)
+//  %%SOLD=@%1F;
+ENDIF
+%%FIRST_HEADER=1
+HEADER=TEXT
+[HEADER2]
+
+[DO_SOLD_PRE]
+IF (%%DID_SOLD=0)
+  LINES=2
+  %SQL='SELECT TIPC,DC,CC '
+  %SQL=+'FROM PLC'+%LLAA+' WHERE CONT = "'+@CONT+'"'
+  SQLOPEN1(%SQL)
+  IF (NOT(@@EOF1)AND(%%DID_SOLD=0))
+    %TIPC=@1A;
+    TEXT[1,1]='|'
+    TEXT[1,40]='Sold la 01 '+%LUNA_LITERE+' '+%ANUL
+    TEXT[1,72]=STRP(18,2,@%1B;)
+    TEXT[1,91]=STRP(18,2,@%1C;)
+    %%TOTAL_DB=@%1B;
+    %%TOTAL_CR=@%1C;
+    IF (%%TOTAL_DB>%%TOTAL_CR)
+      TEXT[1,110]=STRP(19,2,%%TOTAL_DB-%%TOTAL_CR)+' DB'
+    ELSE
+      TEXT[1,110]=STRP(19,2,%%TOTAL_CR-%%TOTAL_DB)+' CR'
+    ENDIF
+//    %%SOLD=@%1E;
+    TEXT[1,132]='|'
+    TEXT[2,1]='|----------------------------------------------------------------------------------------------------------------------------------|'
+    WRITE_TEXT
+    %%NR_RAND=+2
+    %%DID_SOLD=1
+  ENDIF
+ENDIF
+[DO_SOLD_PRE]
+
+[NEW_PAGE]
+%%NUMAR_PAGINA=+1
+%%FIRST_HEADER=1
+HEADER[3,127]='Pag.'
+HEADER[4,127]=STR(3,0,%%NUMAR_PAGINA)
+INSERT[%%LAST_RANDINDEX-%%NR_RAND]=CHR(12)+CHR(13)+CHR(10)+HEADER
+%%NR_RAND=+%%HEADER2_LINES-%%LAST_RANDINDEX
+FLUSH
+[NEW_PAGE]
+
+[DETAIL]
+IF (%%NR_RAND>=%%RAND_MAX) EXEC[NEW_PAGE];
+IF (%OLD_LUNA#@LUNA) EXEC[TOTAL_LUNA];
+%OLD_LUNA=@LUNA
+LINES=1
+TEXT[1,1]='| '+@DATAI 
+TEXT[1,9]='|'
+IF (@TIPN='')
+  TEXT[1,10]='NC'+@NRN
+ELSE
+  TEXT[1,10]='NC'+@NRN+' '+@DEND
+ENDIF
+TEXT[1,17]='|'
+IF (@%NRN#0) TEXT[1,18]=STR(10,0,@%NRDI);
+TEXT[1,28]='|'
+TEXT[1,30]=@EXPLIC
+TEXT[1,62]='|'
+TEXT[1,63]=RIGHT(8,@CONT_COR)
+TEXT[1,71]='|'
+IF (@%DEBIT#0) TEXT[1,72]=STRP(18,2,@%DEBIT);
+TEXT[1,90]='|'
+IF (@%CREDIT#0) TEXT[1,91]=STRP(18,2,@%CREDIT);
+
+%%TOTAL_L_DB=+@%DEBIT
+%%TOTAL_L_CR=+@%CREDIT
+
+%%TOTAL_DB=+@%DEBIT
+%%TOTAL_CR=+@%CREDIT
+//Pentru calcul sold, lasa-le aici
+
+TEXT[1,109]='|'
+
+IF (%%TOTAL_DB>%%TOTAL_CR)
+  TEXT[1,110]=STRP(19,2,%%TOTAL_DB-%%TOTAL_CR)+' DB'
+ELSE
+  TEXT[1,110]=STRP(19,2,%%TOTAL_CR-%%TOTAL_DB)+' CR'
+ENDIF
+
+
+//IF (%TIPC='A') 
+//  %%SOLD=+@%DEBIT-@%CREDIT
+//ELSE 
+//  IF (%TIPC='P')
+//    %%SOLD=+@%CREDIT-@%DEBIT
+//  ELSE
+//    IF (@%DEBIT>@%CREDIT)
+//      %%SOLD=+@%DEBIT-@%CREDIT
+//    ELSE
+//      %%SOLD=+@%CREDIT-@%DEBIT
+//    ENDIF
+//  ENDIF
+//ENDIF
+//TEXT[1,110]=STRP(18,2,%%SOLD)+' '+%DBCR
+TEXT[1,132]='|'
+
+%%LAST_RANDINDEX=%%NR_RAND
+%%NR_RAND=+1
+WRITE_TEXT
+[DETAIL]
+
+[TOTAL_LUNA]
+LINES=3
+RAW1
+|----------------------------------------------------------------------------------------------------------------------------------|  
+|                                      Total rulaj luna ~%OLD_LUNA                                                                 |  
+|----------------------------------------------------------------------------------------------------------------------------------|  
+RAWEND
+TEXT[2,72]=STRP(18,2,%%TOTAL_L_DB)
+TEXT[2,91]=STRP(18,2,%%TOTAL_L_CR)
+%%TOTAL_L_DB=0
+%%TOTAL_L_CR=0
+WRITE_TEXT
+%%NR_RAND=+1
+[TOTAL_LUNA]
+
+[TOTAL]
+EXEC[TOTAL_LUNA]
+LINES=2
+RAW1
+|                                      Total cumulat                                                                               |  
+\==================================================================================================================================/
+RAWEND
+TEXT[1,72]=STRP(18,2,%%TOTAL_DB)
+TEXT[1,91]=STRP(18,2,%%TOTAL_CR)
+//TEXT[1,110]=STRP(18,2,%%SOLD)+' '+%DBCR
+
+IF (%%TOTAL_DB>%%TOTAL_CR)
+  TEXT[1,110]=STRP(19,2,%%TOTAL_DB-%%TOTAL_CR)+' DB'
+ELSE
+  TEXT[1,110]=STRP(19,2,%%TOTAL_CR-%%TOTAL_DB)+' CR'
+ENDIF
+
+%%TOTAL_DB=0
+%%TOTAL_CR=0
+%%SOLD=0
+
+//IF (%%DONE=1) 
+//  TEXT[2,1]='|'
+//  TEXT[2,133]='|'
+//ENDIF
+IF ((%CU_SALT='DA') AND (%%DONE=0)) TEXT[2,134]=CHR(12)+CHR(13)+CHR(10);
+%%NR_RAND=+2
+
+WRITE_TEXT
+
+IF (%%NR_RAND>=%%RAND_MAX) EXEC[NEW_PAGE];
+%%LAST_RANDINDEX=%%NR_RAND
+[TOTAL]

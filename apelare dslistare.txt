@@ -1,0 +1,28 @@
+dsFise.exe 
+ /codfiscal=codul fiscal al firmei in care s-a intrat
+ /perioada:llaa1|llaa2 
+ /tip_lista={fp|fc}
+ /cont=CONT
+ /codfur=FURCLI
+ /param_fp=  (parametrii fisa partener)
+   {defalcare,componenta,salt} 0-Nu;1-Da. Ex: /param_fp=110
+ /param_fc=  (parametrii fisa cont)
+   {salt} 0-Nu;1-Da. Ex: /param_fc=1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/param_fc=  (parametrii fisa cont)
+   {tip_lista|cont_aux|salt} 

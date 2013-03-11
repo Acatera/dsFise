@@ -1,0 +1,4 @@
+Daca se apeleaza din dir firma:
+
+-setari....citesti exe path si de acolo iei setari.ini
+-working dir = "PATH" = SQLDB
